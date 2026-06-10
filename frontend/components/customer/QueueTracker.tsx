@@ -1,0 +1,89 @@
+'use client';
+
+import { api } from '@/lib/api';
+import { getSocket } from '@/lib/socket';
+import { Order, OrderStatus } from '@/types';
+import { useEffect, useState } from 'react';
+
+const STATUS_CONFIG: Record<OrderStatus, { label: string; emoji: string; color: string }> = {
+  PENDING: { label: 'รอทำ', emoji: '⏳', color: 'text-yellow-500' },
+  COOKING: { label: 'กำลังลงเตา 🔥', emoji: '👩‍🍳', color: 'text-orange-500' },
+  DONE: { label: 'พร้อมรับแล้ว!', emoji: '✅', color: 'text-green-500' },
+  CANCELLED: { label: 'ยกเลิกแล้ว', emoji: '❌', color: 'text-red-400' },
+};
+
+interface Props {
+  orderId: number;
+}
+
+export default function QueueTracker({ orderId }: Props) {
+  const [order, setOrder] = useState<Order | null>(null);
+
+  useEffect(() => {
+    api.get<Order>(`/orders/${orderId}`).then((r: import('axios').AxiosResponse<Order>) => setOrder(r.data));
+
+    const s = getSocket();
+    if (!s) return;
+
+    s.emit('join:order', orderId);
+
+    s.on('order:status', (data: { id: number; status: OrderStatus }) => {
+      if (data.id === orderId) {
+        setOrder((prev) => (prev ? { ...prev, status: data.status } : null));
+      }
+    });
+
+    return () => {
+      s.off('order:status');
+    };
+  }, [orderId]);
+
+  if (!order) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-gray-400">กำลังโหลด...</p>
+      </div>
+    );
+  }
+
+  const config = STATUS_CONFIG[order.status];
+
+  return (
+    <div className="min-h-screen bg-orange-50 flex flex-col items-center justify-center p-6">
+      <div className="text-center space-y-4 w-full max-w-sm">
+        <div className="text-6xl">{config.emoji}</div>
+
+        <div className="bg-white rounded-3xl p-8 shadow-md">
+          <p className="text-gray-400 text-sm mb-1">เลขคิวของคุณ</p>
+          <p className="text-6xl font-bold text-orange-500">{order.queueNumber}</p>
+          <p className={`mt-3 text-xl font-bold ${config.color}`}>{config.label}</p>
+        </div>
+
+        <div className="bg-white rounded-2xl p-4 shadow-sm text-left">
+          <p className="text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wide">
+            ออเดอร์ของคุณ
+          </p>
+          {order.items.map((item, idx) => (
+            <div key={idx} className="text-sm mb-1">
+              <span className="font-medium">{item.baseDough.name}</span>
+              {item.toppings.length > 0 && (
+                <span className="text-gray-400">
+                  {' + '}
+                  {item.toppings.map((t) => t.product.name).join(', ')}
+                </span>
+              )}
+            </div>
+          ))}
+          <p className="mt-3 font-bold text-orange-500">฿{Number(order.totalPrice)}</p>
+        </div>
+
+        {order.status === 'DONE' && (
+          <div className="bg-green-500 text-white rounded-2xl p-5 text-center">
+            <p className="font-bold text-lg">เครปของคุณพร้อมแล้ว!</p>
+            <p className="text-sm opacity-90 mt-1">มารับได้เลยครับ/ค่ะ 🥞</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
