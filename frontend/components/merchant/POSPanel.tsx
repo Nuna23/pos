@@ -23,7 +23,10 @@ export default function POSPanel({ branchId }: Props) {
     <div className="min-h-screen bg-gray-50">
       <header className="bg-orange-500 text-white px-4 py-3 flex items-center justify-between">
         <h1 className="font-bold text-base">CrepePOS — แม่ค้า · สาขา {branchId}</h1>
-        <Link href="/order" className="text-xs bg-white/20 px-3 py-1.5 rounded-lg font-medium">
+        <Link
+          href={`/order/${branchId}`}
+          className="text-xs bg-white/20 px-3 py-1.5 rounded-lg font-medium"
+        >
           หน้าลูกค้า
         </Link>
       </header>
