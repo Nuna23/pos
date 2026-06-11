@@ -19,6 +19,9 @@ function route_admin($pdo, $rest, $method)
     if (count($rest) === 1 && $rest[0] === 'finance' && $method === 'GET') {
         return admin_finance($pdo);
     }
+    if (count($rest) === 1 && $rest[0] === 'import' && $method === 'POST') {
+        return admin_import($pdo);
+    }
 
     // Other-costs CRUD
     if (count($rest) === 1 && $rest[0] === 'expenses') {
@@ -143,7 +146,7 @@ function expenses_delete($pdo, $id)
 function admin_stock($pdo)
 {
     $products = $pdo->query(
-        'SELECT id, name, category, stock_quantity FROM products ORDER BY category ASC, name ASC'
+        'SELECT id, name, category, stock_quantity FROM products WHERE is_active = 1 ORDER BY category ASC, name ASC'
     )->fetchAll();
 
     // All allocations in one query, grouped by product.
@@ -424,4 +427,129 @@ function finance_by_profit_desc($a, $b)
         return 0;
     }
     return ($a['profit'] < $b['profit']) ? 1 : -1;
+}
+
+// --- ingredient import (Excel / CSV) ------------------------------------
+//   POST /admin/import  (multipart, field "file")
+// Upserts ingredients by name. Recognised columns (header row, EN or TH,
+// case/space-insensitive): name, category, price, unit_cost, crepes_per_unit,
+// stock. Only the columns present are applied.
+function admin_import($pdo)
+{
+    if (!isset($_FILES['file']) || $_FILES['file']['error'] !== UPLOAD_ERR_OK) {
+        json_out(array('error' => 'no file uploaded'), 400);
+    }
+    $content = file_get_contents($_FILES['file']['tmp_name']);
+    $rows = read_table_file($content);
+    if (count($rows) < 2) {
+        json_out(array('error' => 'ไฟล์ไม่มีข้อมูล (ต้องมีหัวตารางและอย่างน้อย 1 แถว)'), 400);
+    }
+
+    // Map header columns to known fields.
+    $colMap = array();
+    foreach ($rows[0] as $i => $h) {
+        $key = import_field($h);
+        if ($key !== null && !isset($colMap[$key])) {
+            $colMap[$key] = $i;
+        }
+    }
+    if (!isset($colMap['name'])) {
+        json_out(array('error' => 'ไม่พบคอลัมน์ชื่อวัตถุดิบ (name)'), 400);
+    }
+
+    $findStmt = $pdo->prepare('SELECT id FROM products WHERE name = ?');
+    $added = 0;
+    $updated = 0;
+    $skipped = 0;
+
+    foreach (array_slice($rows, 1) as $r) {
+        $name = isset($colMap['name']) ? trim((string) v($r, $colMap['name'], '')) : '';
+        if ($name === '') {
+            $skipped++;
+            continue;
+        }
+        $price    = import_num($r, $colMap, 'price');
+        $unitCost = import_num($r, $colMap, 'unit_cost');
+        $crepes   = import_num($r, $colMap, 'crepes_per_unit');
+        $stock    = import_num($r, $colMap, 'stock');
+        $category = import_category(isset($colMap['category']) ? v($r, $colMap['category'], '') : '');
+
+        $findStmt->execute(array($name));
+        $existing = $findStmt->fetch();
+
+        if ($existing) {
+            // Update only the provided columns; re-activate if it was deleted.
+            $sets = array('is_active = 1');
+            $params = array();
+            if (isset($colMap['category'])) { $sets[] = 'category = ?'; $params[] = $category; }
+            if ($price !== null)    { $sets[] = 'price = ?';            $params[] = $price; }
+            if ($unitCost !== null) { $sets[] = 'unit_cost = ?';        $params[] = $unitCost; }
+            if ($crepes !== null)   { $sets[] = 'crepes_per_unit = ?';  $params[] = $crepes; }
+            if ($stock !== null)    { $sets[] = 'stock_quantity = ?';   $params[] = $stock; }
+            $params[] = (int) $existing['id'];
+            $pdo->prepare('UPDATE products SET ' . implode(', ', $sets) . ' WHERE id = ?')->execute($params);
+            $updated++;
+        } else {
+            // New ingredient needs a sell price.
+            if ($price === null || $price <= 0) {
+                $skipped++;
+                continue;
+            }
+            $stmt = $pdo->prepare(
+                'INSERT INTO products (name, category, price, unit_cost, crepes_per_unit, stock_quantity, alert_threshold, deduction_amount)
+                 VALUES (?, ?, ?, ?, ?, ?, 0, 1)'
+            );
+            $stmt->execute(array(
+                $name,
+                $category,
+                $price,
+                $unitCost !== null ? $unitCost : 0,
+                $crepes !== null ? $crepes : 1,
+                $stock !== null ? $stock : 0,
+            ));
+            $added++;
+        }
+    }
+
+    json_out(array('added' => $added, 'updated' => $updated, 'skipped' => $skipped));
+}
+
+// Normalise a header cell and map it to a known field key (or null).
+function import_field($h)
+{
+    $h = strtolower(trim((string) $h));
+    $h = preg_replace('/\s+/', '', $h);
+    $aliases = array(
+        'name' => 'name', 'ชื่อ' => 'name', 'ชื่อวัตถุดิบ' => 'name', 'ingredient' => 'name', 'วัตถุดิบ' => 'name',
+        'category' => 'category', 'ประเภท' => 'category', 'type' => 'category', 'หมวด' => 'category',
+        'price' => 'price', 'ราคา' => 'price', 'ราคาขาย' => 'price', 'sellprice' => 'price',
+        'unitcost' => 'unit_cost', 'unit_cost' => 'unit_cost', 'cost' => 'unit_cost',
+        'ต้นทุน' => 'unit_cost', 'ทุน' => 'unit_cost', 'ทุนต่อหน่วย' => 'unit_cost', 'ทุน/หน่วย' => 'unit_cost',
+        'crepesperunit' => 'crepes_per_unit', 'crepes_per_unit' => 'crepes_per_unit', 'crepes' => 'crepes_per_unit',
+        'จำนวนเครป' => 'crepes_per_unit', 'ทำได้' => 'crepes_per_unit', 'เครปต่อหน่วย' => 'crepes_per_unit',
+        'stock' => 'stock', 'สต็อก' => 'stock', 'stockquantity' => 'stock', 'คงคลัง' => 'stock',
+    );
+    return isset($aliases[$h]) ? $aliases[$h] : null;
+}
+
+function import_num($row, $colMap, $key)
+{
+    if (!isset($colMap[$key])) {
+        return null;
+    }
+    $raw = isset($row[$colMap[$key]]) ? trim((string) $row[$colMap[$key]]) : '';
+    if ($raw === '') {
+        return null;
+    }
+    $raw = str_replace(',', '', $raw); // tolerate thousands separators
+    return is_numeric($raw) ? (float) $raw : null;
+}
+
+function import_category($v)
+{
+    $v = trim((string) $v);
+    if ($v === 'DOUGH' || strtolower($v) === 'dough' || strpos($v, 'แป้ง') !== false) {
+        return 'DOUGH';
+    }
+    return 'TOPPING';
 }

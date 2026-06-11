@@ -3,10 +3,37 @@
 import { api } from '@/lib/api';
 import { Order, OrderStatus } from '@/types';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 // The PHP backend has no websocket, so the tracker polls for status changes.
 const POLL_INTERVAL = 3000;
+
+// Show a local "crepe ready" notification when the order turns DONE. This works
+// on any backend (including PHP 5.6) — it's fired by the page that's polling,
+// not pushed from the server. Falls back to nothing if permission isn't granted.
+function notifyReady(order: Order) {
+  if (typeof window === 'undefined' || !('Notification' in window)) return;
+  if (Notification.permission !== 'granted') return;
+  const title = 'เครปของคุณพร้อมแล้ว! 🥞';
+  const body = `คิวที่ ${order.queueNumber} มารับได้เลย`;
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.ready
+      .then((reg) => reg.showNotification(title, { body, icon: '/icon-192.png' }))
+      .catch(() => {
+        try {
+          new Notification(title, { body });
+        } catch {
+          /* ignore */
+        }
+      });
+  } else {
+    try {
+      new Notification(title, { body });
+    } catch {
+      /* ignore */
+    }
+  }
+}
 
 const STATUS_CONFIG: Record<OrderStatus, { label: string; emoji: string; color: string }> = {
   PENDING: { label: 'รอทำ', emoji: '⏳', color: 'text-yellow-500' },
@@ -21,6 +48,7 @@ interface Props {
 
 export default function QueueTracker({ orderId }: Props) {
   const [order, setOrder] = useState<Order | null>(null);
+  const notifiedRef = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -31,6 +59,11 @@ export default function QueueTracker({ orderId }: Props) {
         .get<Order>(`/orders/${orderId}`)
         .then((r: import('axios').AxiosResponse<Order>) => {
           if (!active) return;
+          // Fire the "ready" notification once, on the transition to DONE.
+          if (r.data.status === 'DONE' && !notifiedRef.current) {
+            notifiedRef.current = true;
+            notifyReady(r.data);
+          }
           setOrder(r.data);
           // No more changes coming once the order is finished — stop polling.
           if (r.data.status === 'DONE' || r.data.status === 'CANCELLED') {

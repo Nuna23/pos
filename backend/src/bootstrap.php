@@ -10,6 +10,7 @@ require __DIR__ . '/serialize.php';
 require __DIR__ . '/lib/line.php';
 require __DIR__ . '/lib/webpush.php';
 require __DIR__ . '/lib/xlsx.php';
+require __DIR__ . '/lib/xlsx_read.php';
 require __DIR__ . '/routes/products.php';
 require __DIR__ . '/routes/orders.php';
 require __DIR__ . '/routes/dashboard.php';

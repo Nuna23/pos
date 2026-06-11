@@ -109,26 +109,20 @@ export default function OrderFlow({ mode, branchId, onPlaced }: Props) {
     setLoading(true);
     setError(null);
     try {
-      let pushSubscription = null;
-
-      // Only the customer's own device should receive the "ready" push.
-      if (mode === 'customer' && 'serviceWorker' in navigator && 'PushManager' in window) {
+      // The customer waits on the queue page, which fires a local notification
+      // when the order turns DONE (works on any backend — no web push). Ask for
+      // permission now, while we have the user's tap, and register the SW that
+      // shows the notification.
+      if (mode === 'customer' && typeof window !== 'undefined' && 'Notification' in window) {
         try {
-          const reg = await navigator.serviceWorker.register('/sw.js');
-          const sub = await reg.pushManager.subscribe({
-            userVisibleOnly: true,
-            applicationServerKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
-          });
-          const subJson = sub.toJSON();
-          if (subJson.keys) {
-            pushSubscription = {
-              endpoint: sub.endpoint,
-              p256dh: subJson.keys.p256dh,
-              auth: subJson.keys.auth,
-            };
+          if ('serviceWorker' in navigator) {
+            await navigator.serviceWorker.register('/sw.js');
+          }
+          if (Notification.permission === 'default') {
+            await Notification.requestPermission();
           }
         } catch {
-          // Push denied — order proceeds without web push.
+          // Notifications unavailable/denied — order proceeds without them.
         }
       }
 
@@ -145,7 +139,6 @@ export default function OrderFlow({ mode, branchId, onPlaced }: Props) {
         branchId,
         items,
         paymentMethod,
-        pushSubscription,
       });
       setCart([]);
       setShowPayment(false);

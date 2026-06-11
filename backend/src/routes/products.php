@@ -49,10 +49,10 @@ function products_list($pdo)
 {
     $category = v($_GET, 'category');
     if ($category === 'DOUGH' || $category === 'TOPPING') {
-        $stmt = $pdo->prepare('SELECT * FROM products WHERE category = ? ORDER BY name ASC');
+        $stmt = $pdo->prepare('SELECT * FROM products WHERE is_active = 1 AND category = ? ORDER BY name ASC');
         $stmt->execute(array($category));
     } else {
-        $stmt = $pdo->query('SELECT * FROM products ORDER BY name ASC');
+        $stmt = $pdo->query('SELECT * FROM products WHERE is_active = 1 ORDER BY name ASC');
     }
     $out = array();
     foreach ($stmt->fetchAll() as $r) {
@@ -177,8 +177,11 @@ function products_remove($pdo, $id)
     if (!$row) {
         json_out(array('error' => "Product #$id not found"), 404);
     }
-    $pdo->prepare('DELETE FROM products WHERE id = ?')->execute(array($id));
-    json_out(product_json($row));
+    // Soft delete: keep the row (orders/finance history reference it) but hide
+    // it and drop its branch allocations so it leaves the menus.
+    $pdo->prepare('UPDATE products SET is_active = 0 WHERE id = ?')->execute(array($id));
+    $pdo->prepare('DELETE FROM branch_stock WHERE product_id = ?')->execute(array($id));
+    json_out(array('ok' => true, 'id' => (int) $id));
 }
 
 function product_row($pdo, $id)

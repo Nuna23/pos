@@ -73,6 +73,7 @@ function ensure_schema($pdo)
         table_exists($pdo, 'branch_stock') &&
         table_exists($pdo, 'expenses') &&
         column_exists($pdo, 'products', 'unit_cost') &&
+        column_exists($pdo, 'products', 'is_active') &&
         column_exists($pdo, 'orders', 'branch_id') &&
         column_exists($pdo, 'expenses', 'frequency')
     ) {
@@ -93,6 +94,10 @@ function ensure_schema($pdo)
     if (!column_exists($pdo, 'products', 'unit_cost')) {
         safe_exec($pdo, 'ALTER TABLE products ADD COLUMN unit_cost DECIMAL(10,2) NOT NULL DEFAULT 0 AFTER price');
         safe_exec($pdo, 'ALTER TABLE products ADD COLUMN crepes_per_unit DOUBLE NOT NULL DEFAULT 1 AFTER unit_cost');
+    }
+    // Soft-delete flag (deleted ingredients are hidden but kept for history).
+    if (!column_exists($pdo, 'products', 'is_active')) {
+        safe_exec($pdo, 'ALTER TABLE products ADD COLUMN is_active TINYINT(1) NOT NULL DEFAULT 1');
     }
     // Admin-managed "other costs" (rent, gas, wages, ...). frequency = ONCE for
     // a one-day cost, or MONTHLY for a recurring cost spread evenly per day.
@@ -153,6 +158,7 @@ function create_schema($pdo)
             alert_threshold  DOUBLE NOT NULL,
             deduction_amount DOUBLE NOT NULL DEFAULT 1,
             alert_sent       TINYINT(1) NOT NULL DEFAULT 0,
+            is_active        TINYINT(1) NOT NULL DEFAULT 1,
             created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
             updated_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             UNIQUE KEY uniq_product_name (name)
