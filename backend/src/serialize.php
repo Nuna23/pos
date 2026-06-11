@@ -7,9 +7,11 @@ function iso_date($dt)
     if ($dt === null || $dt === '') {
         return null;
     }
-    // MySQL DATETIME "Y-m-d H:i:s" -> ISO-ish "Y-m-dTH:i:s" (string; the
-    // frontend only ever passes these to new Date()).
-    return str_replace(' ', 'T', (string) $dt);
+    // MySQL DATETIME "Y-m-d H:i:s" -> full ISO 8601 with the app's UTC offset,
+    // e.g. "2026-06-11T10:46:58+07:00". The DB session runs in the app timezone
+    // (see db.php), so the stored wall-clock IS local time; tagging it with the
+    // offset makes new Date() in the browser unambiguous instead of guessing.
+    return str_replace(' ', 'T', (string) $dt) . date('P');
 }
 
 function product_json($r)
@@ -19,6 +21,12 @@ function product_json($r)
         'name'            => $r['name'],
         'category'        => $r['category'],
         'price'           => (float) $r['price'],
+        'unitCost'        => isset($r['unit_cost']) ? (float) $r['unit_cost'] : 0,
+        'crepesPerUnit'   => isset($r['crepes_per_unit']) ? (float) $r['crepes_per_unit'] : 1,
+        // Per-crepe cost derived from the unit cost (single source of truth).
+        'costPrice'       => (isset($r['crepes_per_unit']) && (float) $r['crepes_per_unit'] > 0)
+            ? (float) $r['unit_cost'] / (float) $r['crepes_per_unit']
+            : 0,
         'stockQuantity'   => (float) $r['stock_quantity'],
         'alertThreshold'  => (float) $r['alert_threshold'],
         'deductionAmount' => (float) $r['deduction_amount'],
@@ -52,6 +60,8 @@ function order_json($o, $items)
         'queueNumber'  => (int) $o['queue_number'],
         'totalPrice'   => (float) $o['total_price'],
         'status'       => $o['status'],
+        'paymentMethod' => v($o, 'payment_method'),
+        'branchId'     => v($o, 'branch_id') !== null ? (int) $o['branch_id'] : null,
         'pushEndpoint' => v($o, 'push_endpoint'),
         'createdAt'    => iso_date(v($o, 'created_at')),
         'updatedAt'    => iso_date(v($o, 'updated_at')),

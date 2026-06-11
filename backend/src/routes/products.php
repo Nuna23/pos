@@ -73,12 +73,14 @@ function products_find_one($pdo, $id)
 function products_create($pdo)
 {
     $b = json_body();
-    $name     = trim((string) v($b, 'name', ''));
-    $category = (string) v($b, 'category', '');
-    $price    = v($b, 'price');
-    $stock    = v($b, 'stockQuantity');
-    $thresh   = v($b, 'alertThreshold');
-    $deduct   = v($b, 'deductionAmount');
+    $name      = trim((string) v($b, 'name', ''));
+    $category  = (string) v($b, 'category', '');
+    $price     = v($b, 'price');
+    $unitCost  = v($b, 'unitCost', 0);
+    $crepesPer = v($b, 'crepesPerUnit', 1);
+    $stock     = v($b, 'stockQuantity');
+    $thresh    = v($b, 'alertThreshold');
+    $deduct    = v($b, 'deductionAmount');
 
     if ($name === '') {
         json_out(array('error' => 'name is required'), 400);
@@ -89,17 +91,20 @@ function products_create($pdo)
     if (!is_numeric($price) || $price <= 0) {
         json_out(array('error' => 'price must be a positive number'), 400);
     }
-    foreach (array('stockQuantity' => $stock, 'alertThreshold' => $thresh, 'deductionAmount' => $deduct) as $k => $val) {
+    foreach (array('stockQuantity' => $stock, 'alertThreshold' => $thresh, 'deductionAmount' => $deduct, 'unitCost' => $unitCost) as $k => $val) {
         if (!is_numeric($val) || $val < 0) {
             json_out(array('error' => "$k must be a number >= 0"), 400);
         }
     }
+    if (!is_numeric($crepesPer) || $crepesPer <= 0) {
+        json_out(array('error' => 'crepesPerUnit must be a positive number'), 400);
+    }
 
     $stmt = $pdo->prepare(
-        'INSERT INTO products (name, category, price, stock_quantity, alert_threshold, deduction_amount)
-         VALUES (?, ?, ?, ?, ?, ?)'
+        'INSERT INTO products (name, category, price, unit_cost, crepes_per_unit, stock_quantity, alert_threshold, deduction_amount)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
     );
-    $stmt->execute(array($name, $category, $price, $stock, $thresh, $deduct));
+    $stmt->execute(array($name, $category, $price, $unitCost, $crepesPer, $stock, $thresh, $deduct));
     $id = (int) $pdo->lastInsertId();
     json_out(product_json(product_row($pdo, $id)), 201);
 }
@@ -117,6 +122,8 @@ function products_update($pdo, $id)
         'name'            => 'name',
         'category'        => 'category',
         'price'           => 'price',
+        'unitCost'        => 'unit_cost',
+        'crepesPerUnit'   => 'crepes_per_unit',
         'stockQuantity'   => 'stock_quantity',
         'alertThreshold'  => 'alert_threshold',
         'deductionAmount' => 'deduction_amount',

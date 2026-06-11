@@ -3,7 +3,6 @@
 import OrderCard from '@/components/merchant/OrderCard';
 import { api } from '@/lib/api';
 import { Order, OrderStatus } from '@/types';
-import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 // How often to refresh the board from the server (ms). The PHP backend has no
@@ -51,20 +50,12 @@ export default function KanbanBoard() {
     orders.filter((o) => o.status === status).sort((a, b) => a.queueNumber - b.queueNumber);
 
   return (
-    <div className="min-h-screen bg-gray-100 p-3">
+    <div className="bg-gray-100 p-3">
       <div className="flex items-center justify-between mb-3">
         <h1 className="text-lg font-bold text-gray-800">กระดานหน้าเตา</h1>
-        <div className="flex gap-2">
-          <span className="text-xs text-gray-400 self-center">
-            {new Date().toLocaleDateString('th-TH')}
-          </span>
-          <Link
-            href="/merchant"
-            className="text-xs text-orange-500 border border-orange-300 px-2 py-1 rounded-lg"
-          >
-            POS
-          </Link>
-        </div>
+        <span className="text-xs text-gray-400 self-center">
+          {new Date().toLocaleDateString('th-TH')}
+        </span>
       </div>
 
       <div className="grid grid-cols-3 gap-2">

@@ -1,0 +1,3 @@
+1. for customer, change from ยืนยัน to เพิ่มใส่ตะกร้า, allow user to add more crape or add the amount of certain crape, then in ตะกร้า, have checkout button to pay, which can choose between pay via qr or cash, each ตะกร้า count as 1 order
+2. move หน้าแม่ค้า to top-right of page (same as JLcheckin), remove กระดานหน้าเตา and dahsboard button, move them to be tabs in หน้าแม่ค้า, keep the function the same
+3. first tab in หน้าแม่ค้า is like customer, which is for when customer order to แม่ค้า directly, functional same as customer tabs (1. req)

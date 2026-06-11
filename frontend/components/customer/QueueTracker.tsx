@@ -2,6 +2,7 @@
 
 import { api } from '@/lib/api';
 import { Order, OrderStatus } from '@/types';
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
 // The PHP backend has no websocket, so the tracker polls for status changes.
@@ -92,6 +93,13 @@ export default function QueueTracker({ orderId }: Props) {
             <p className="text-sm opacity-90 mt-1">มารับได้เลยครับ/ค่ะ 🥞</p>
           </div>
         )}
+
+        <Link
+          href={order.branchId ? `/order/${order.branchId}` : '/order'}
+          className="block w-full bg-white border-2 border-orange-400 text-orange-500 py-3 rounded-2xl font-semibold shadow-sm hover:bg-orange-100 transition"
+        >
+          ← กลับไปสั่งเครป
+        </Link>
       </div>
     </div>
   );
