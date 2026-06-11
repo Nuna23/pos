@@ -124,15 +124,57 @@ function orders_create($pdo)
     $push = v($b, 'pushSubscription');
     $hasPush = is_array($push) && v($push, 'endpoint') && v($push, 'p256dh') && v($push, 'auth');
 
+    $payment = v($b, 'paymentMethod');
+    if ($payment !== 'CASH' && $payment !== 'QR') {
+        $payment = null;
+    }
+
+    $branchId = v($b, 'branchId');
+    $branchId = in_array((int) $branchId, array(1, 2, 3), true) ? (int) $branchId : null;
+
+    // Total amount of each ingredient this order consumes (deduction per use).
+    $needed = array();
+    foreach ($items as $item) {
+        $doughId = (int) $item['baseDoughId'];
+        $needed[$doughId] = (isset($needed[$doughId]) ? $needed[$doughId] : 0) + $products[$doughId]['deductionAmount'];
+        foreach ($item['toppingIds'] as $tid) {
+            $tid = (int) $tid;
+            $needed[$tid] = (isset($needed[$tid]) ? $needed[$tid] : 0) + $products[$tid]['deductionAmount'];
+        }
+    }
+
     $pdo->beginTransaction();
     try {
+        // When ordering from a branch, make sure it has enough of each
+        // ingredient (otherwise the customer shouldn't have been able to pick it).
+        if ($branchId !== null) {
+            $check = $pdo->prepare(
+                'SELECT quantity FROM branch_stock WHERE branch_id = ? AND product_id = ? FOR UPDATE'
+            );
+            foreach ($needed as $pid => $amt) {
+                $check->execute(array($branchId, $pid));
+                $have = $check->fetchColumn();
+                $have = ($have === false) ? 0 : (float) $have;
+                if ($have < $amt) {
+                    $pdo->rollBack();
+                    json_out(array(
+                        'error'     => 'out_of_stock',
+                        'product'   => $products[$pid]['name'],
+                        'productId' => $pid,
+                    ), 409);
+                }
+            }
+        }
+
         $stmt = $pdo->prepare(
-            'INSERT INTO orders (queue_number, total_price, push_endpoint, push_p256dh, push_auth)
-             VALUES (?, ?, ?, ?, ?)'
+            'INSERT INTO orders (queue_number, total_price, payment_method, branch_id, push_endpoint, push_p256dh, push_auth)
+             VALUES (?, ?, ?, ?, ?, ?, ?)'
         );
         $stmt->execute(array(
             $queueNumber,
             $totalPrice,
+            $payment,
+            $branchId,
             $hasPush ? $push['endpoint'] : null,
             $hasPush ? $push['p256dh'] : null,
             $hasPush ? $push['auth'] : null,
@@ -153,6 +195,17 @@ function orders_create($pdo)
                 $tid = (int) $tid;
                 $insTop->execute(array($itemId, $tid));
                 $deduct->execute(array($products[$tid]['deductionAmount'], $tid));
+            }
+        }
+
+        // Deduct the branch's allocation too, keeping total stock and branch
+        // stock consistent.
+        if ($branchId !== null) {
+            $deductBranch = $pdo->prepare(
+                'UPDATE branch_stock SET quantity = quantity - ? WHERE branch_id = ? AND product_id = ?'
+            );
+            foreach ($needed as $pid => $amt) {
+                $deductBranch->execute(array($amt, $branchId, $pid));
             }
         }
 

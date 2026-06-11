@@ -36,6 +36,12 @@ switch ($resource) {
     case 'internal':
         route_internal($pdo, $config, $segments, $method);
         break;
+    case 'branches':
+        route_branches($pdo, $segments, $method);
+        break;
+    case 'admin':
+        route_admin($pdo, $segments, $method);
+        break;
     default:
         json_out(array('error' => 'not found'), 404);
 }

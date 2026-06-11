@@ -14,6 +14,8 @@ require __DIR__ . '/routes/products.php';
 require __DIR__ . '/routes/orders.php';
 require __DIR__ . '/routes/dashboard.php';
 require __DIR__ . '/routes/internal.php';
+require __DIR__ . '/routes/branches.php';
+require __DIR__ . '/routes/admin.php';
 
 $config = require __DIR__ . '/config.php';
 date_default_timezone_set($config['tz']);

@@ -1,11 +1,15 @@
 export type OrderStatus = 'PENDING' | 'COOKING' | 'DONE' | 'CANCELLED';
 export type ProductCategory = 'DOUGH' | 'TOPPING';
+export type PaymentMethod = 'CASH' | 'QR';
 
 export interface Product {
   id: number;
   name: string;
   category: ProductCategory;
   price: number;
+  unitCost: number; // cost of one unit (e.g. a bag of flour)
+  crepesPerUnit: number; // how many crepes one unit makes
+  costPrice: number; // derived per-crepe cost = unitCost / crepesPerUnit
   stockQuantity: number;
   alertThreshold: number;
   deductionAmount: number;
@@ -34,6 +38,8 @@ export interface Order {
   queueNumber: number;
   totalPrice: number;
   status: OrderStatus;
+  paymentMethod: PaymentMethod | null;
+  branchId: number | null;
   pushEndpoint: string | null;
   createdAt: string;
   updatedAt: string;
