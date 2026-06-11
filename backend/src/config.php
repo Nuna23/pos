@@ -25,9 +25,9 @@ return array(
     'line_user_id' => getenv('LINE_NOTIFY_USER_ID') ?: '',
 
     // --- Web Push (VAPID) — "your crepe is ready" to the customer ---
-    'vapid_public'  => getenv('WEB_PUSH_VAPID_PUBLIC_KEY') ?: '',
-    'vapid_private' => getenv('WEB_PUSH_VAPID_PRIVATE_KEY') ?: '',
-    'vapid_subject' => getenv('WEB_PUSH_VAPID_EMAIL') ?: 'mailto:admin@example.com',
+    'vapid_public'  => getenv('VAPID_PUBLIC_KEY') ?: 'BApbdQIY77kyE2g05LVZiABYVcY7T7xAlJAAvXzp3mqWT6cNmsx5b85VqnAAh_H9-FmtzppDRRQW-L9-m6aoyb0',
+    'vapid_private' => getenv('VAPID_PRIVATE_KEY') ?: 'FRlcBm7eYR5mAuC1jojWrAAdQobZEDbKsXLQIMqtp9c',
+    'vapid_subject' => getenv('VAPID_SUBJECT') ?: 'mailto:palmome23@gmail.com',
 
     // Shared secret that protects the cron-triggered stock-alert HTTP endpoint.
     'cron_secret' => getenv('CRON_SECRET') ?: 'changeme',
