@@ -1,9 +1,11 @@
 'use client';
 
 import { api } from '@/lib/api';
-import { getSocket } from '@/lib/socket';
 import { Order, OrderStatus } from '@/types';
 import { useEffect, useState } from 'react';
+
+// The PHP backend has no websocket, so the tracker polls for status changes.
+const POLL_INTERVAL = 3000;
 
 const STATUS_CONFIG: Record<OrderStatus, { label: string; emoji: string; color: string }> = {
   PENDING: { label: 'รอทำ', emoji: '⏳', color: 'text-yellow-500' },
@@ -20,21 +22,28 @@ export default function QueueTracker({ orderId }: Props) {
   const [order, setOrder] = useState<Order | null>(null);
 
   useEffect(() => {
-    api.get<Order>(`/orders/${orderId}`).then((r: import('axios').AxiosResponse<Order>) => setOrder(r.data));
+    let active = true;
+    let timer: ReturnType<typeof setInterval>;
 
-    const s = getSocket();
-    if (!s) return;
+    const load = () =>
+      api
+        .get<Order>(`/orders/${orderId}`)
+        .then((r: import('axios').AxiosResponse<Order>) => {
+          if (!active) return;
+          setOrder(r.data);
+          // No more changes coming once the order is finished — stop polling.
+          if (r.data.status === 'DONE' || r.data.status === 'CANCELLED') {
+            clearInterval(timer);
+          }
+        })
+        .catch(() => {});
 
-    s.emit('join:order', orderId);
-
-    s.on('order:status', (data: { id: number; status: OrderStatus }) => {
-      if (data.id === orderId) {
-        setOrder((prev) => (prev ? { ...prev, status: data.status } : null));
-      }
-    });
+    load();
+    timer = setInterval(load, POLL_INTERVAL);
 
     return () => {
-      s.off('order:status');
+      active = false;
+      clearInterval(timer);
     };
   }, [orderId]);
 

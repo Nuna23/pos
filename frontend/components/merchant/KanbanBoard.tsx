@@ -2,10 +2,13 @@
 
 import OrderCard from '@/components/merchant/OrderCard';
 import { api } from '@/lib/api';
-import { getSocket } from '@/lib/socket';
 import { Order, OrderStatus } from '@/types';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+
+// How often to refresh the board from the server (ms). The PHP backend has no
+// websocket, so the board polls instead.
+const POLL_INTERVAL = 3000;
 
 const COLUMNS: { id: OrderStatus; label: string; color: string }[] = [
   { id: 'PENDING', label: 'รอทำ', color: 'bg-yellow-50 border-yellow-200' },
@@ -17,25 +20,30 @@ export default function KanbanBoard() {
   const [orders, setOrders] = useState<Order[]>([]);
 
   useEffect(() => {
-    api.get<Order[]>('/orders/today').then((r: import('axios').AxiosResponse<Order[]>) => setOrders(r.data));
+    let active = true;
 
-    const s = getSocket();
-    if (!s) return;
+    const load = () =>
+      api
+        .get<Order[]>('/orders/today')
+        .then((r: import('axios').AxiosResponse<Order[]>) => {
+          if (active) setOrders(r.data);
+        })
+        .catch(() => {});
 
-    s.on('order:new', (order: Order) => {
-      setOrders((prev) => [order, ...prev]);
-    });
-    s.on('order:updated', (updated: Order) => {
-      setOrders((prev) => prev.map((o) => (o.id === updated.id ? updated : o)));
-    });
+    load();
+    const timer = setInterval(load, POLL_INTERVAL);
 
     return () => {
-      s.off('order:new');
-      s.off('order:updated');
+      active = false;
+      clearInterval(timer);
     };
   }, []);
 
   const handleStatusChange = async (orderId: number, newStatus: OrderStatus) => {
+    // Optimistic update so the card moves instantly; the poll reconciles soon.
+    setOrders((prev) =>
+      prev.map((o) => (o.id === orderId ? { ...o, status: newStatus } : o)),
+    );
     await api.put(`/orders/${orderId}/status`, { status: newStatus });
   };
 

@@ -1,0 +1,85 @@
+# CrepePOS full stack: MariaDB + PHP backend + Next.js frontend.
+#
+#   docker compose up --build
+#
+#   Frontend:    http://localhost:3000
+#   Backend API: http://localhost:3001/api
+#   phpMyAdmin:  http://localhost:8080   (profile "tools": add --profile tools)
+#
+# The backend creates its own tables and seeds the crepe menu on first request.
+
+services:
+  db:
+    image: mariadb:10.11
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: rootpass
+      MARIADB_DATABASE: baanrac1_crepepos
+      MARIADB_USER: baanrac1_crepepos
+      MARIADB_PASSWORD: Jlhome2026
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    environment:
+      DB_HOST: db
+      DB_PORT: "3306"
+      DB_NAME: baanrac1_crepepos
+      DB_USER: baanrac1_crepepos
+      DB_PASS: Jlhome2026
+      APP_TZ: Asia/Bangkok
+      FRONTEND_URL: http://localhost:3000
+      # Fill these to enable notifications (LINE works on 5.6; web push needs 7.3+).
+      LINE_CHANNEL_ACCESS_TOKEN: ""
+      LINE_NOTIFY_USER_ID: ""
+      WEB_PUSH_VAPID_PUBLIC_KEY: ""
+      WEB_PUSH_VAPID_PRIVATE_KEY: ""
+      WEB_PUSH_VAPID_EMAIL: mailto:admin@example.com
+      CRON_SECRET: changeme
+    ports:
+      - "3001:80"
+    # Live-edit PHP without rebuilding (mirrors JLcheckin's dev setup).
+    volumes:
+      - ./backend:/var/www/html
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # Browser-facing URLs (the browser, not the container, calls these).
+        NEXT_PUBLIC_API_URL: http://localhost:3001/api
+        NEXT_PUBLIC_VAPID_PUBLIC_KEY: ""
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+  phpmyadmin:
+    image: phpmyadmin:5
+    restart: unless-stopped
+    profiles: ["tools"]
+    environment:
+      PMA_HOST: db
+      PMA_PORT: 3306
+    ports:
+      - "8080:80"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  db_data:
