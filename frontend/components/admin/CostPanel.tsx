@@ -2,7 +2,7 @@
 
 import { api } from '@/lib/api';
 import { Product, ProductCategory } from '@/types';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 // Ingredient management: add ingredients, edit each one's sell price, and set
 // the unit-based cost (cost per unit + crepes per unit -> per-crepe cost, which
@@ -22,6 +22,11 @@ export default function CostPanel() {
   const [nCrepes, setNCrepes] = useState('');
   const [nStock, setNStock] = useState('');
   const [adding, setAdding] = useState(false);
+
+  // Import
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [importMsg, setImportMsg] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
 
   const load = () => {
     api.get<Product[]>('/products').then((r) => {
@@ -77,6 +82,34 @@ export default function CostPanel() {
     }
   };
 
+  const remove = async (p: Product) => {
+    if (!window.confirm(`ลบ "${p.name}" ?`)) return;
+    await api.delete(`/products/${p.id}`);
+    load();
+  };
+
+  const importFile = async (file: File) => {
+    setImporting(true);
+    setImportMsg(null);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await api.post<{ added: number; updated: number; skipped: number }>(
+        '/admin/import',
+        fd,
+      );
+      const { added, updated, skipped } = res.data;
+      setImportMsg(`นำเข้าสำเร็จ: เพิ่ม ${added} · อัปเดต ${updated} · ข้าม ${skipped}`);
+      load();
+    } catch (e) {
+      const err = e as import('axios').AxiosError<{ error?: string }>;
+      setImportMsg(err.response?.data?.error ?? 'นำเข้าไม่สำเร็จ');
+    } finally {
+      setImporting(false);
+      if (fileRef.current) fileRef.current.value = '';
+    }
+  };
+
   const input =
     'border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-gray-800 min-w-0';
 
@@ -129,6 +162,34 @@ export default function CostPanel() {
         </div>
       </section>
 
+      {/* Import from Excel / CSV on the admin's machine */}
+      <section className="bg-white rounded-2xl p-4 shadow-sm space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold text-gray-500">นำเข้าจากไฟล์ Excel</h2>
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".xlsx,.csv"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) importFile(f);
+            }}
+          />
+          <button
+            onClick={() => fileRef.current?.click()}
+            disabled={importing}
+            className="bg-green-600 text-white text-sm font-medium px-4 py-1.5 rounded-lg disabled:opacity-50"
+          >
+            {importing ? 'กำลังนำเข้า...' : 'เลือกไฟล์ (.xlsx / .csv)'}
+          </button>
+        </div>
+        <p className="text-[11px] text-gray-400">
+          คอลัมน์: name, category, price, unit_cost, crepes_per_unit (จับคู่ตามชื่อวัตถุดิบ)
+        </p>
+        {importMsg && <p className="text-xs text-gray-700">{importMsg}</p>}
+      </section>
+
       <p className="text-xs text-gray-400 px-1">
         แก้ราคาขายและต้นทุน (ต้นทุน/เครป = ทุนต่อหน่วย ÷ จำนวนเครป)
       </p>
@@ -170,6 +231,12 @@ export default function CostPanel() {
                 className="ml-auto bg-gray-800 text-white text-xs font-medium px-3 py-1.5 rounded-lg disabled:opacity-50"
               >
                 บันทึก
+              </button>
+              <button
+                onClick={() => remove(p)}
+                className="bg-red-50 text-red-500 text-xs font-medium px-3 py-1.5 rounded-lg border border-red-200"
+              >
+                ลบ
               </button>
             </div>
           </div>

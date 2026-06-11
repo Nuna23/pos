@@ -35,7 +35,7 @@ function branch_stock_list($pdo, $branchId)
         'SELECT p.id, p.name, p.category, p.alert_threshold, bs.quantity
          FROM branch_stock bs
          JOIN products p ON p.id = bs.product_id
-         WHERE bs.branch_id = ? AND bs.quantity > 0
+         WHERE bs.branch_id = ? AND bs.quantity > 0 AND p.is_active = 1
          ORDER BY p.category ASC, p.name ASC'
     );
     $stmt->execute(array($branchId));
