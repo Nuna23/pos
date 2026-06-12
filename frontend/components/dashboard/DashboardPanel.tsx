@@ -3,10 +3,11 @@
 import SalesChart from '@/components/dashboard/SalesChart';
 import TopToppings from '@/components/dashboard/TopToppings';
 import { api } from '@/lib/api';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 interface DashboardSummary {
   period: string;
+  date: string;
   totalRevenue: number;
   orderCount: number;
   peakHours: { hour: number; count: number }[];
@@ -14,20 +15,32 @@ interface DashboardSummary {
 }
 
 export default function DashboardPanel() {
+  const today = new Date().toISOString().slice(0, 10);
   const [period, setPeriod] = useState<'day' | 'month'>('day');
+  const [date, setDate] = useState(today);
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Start/end of the selected day or month (for the Excel export window).
+  const range = useCallback(() => {
+    if (period === 'day') return { start: date, end: date };
+    const start = date.slice(0, 8) + '01';
+    const d = new Date(date);
+    const end = new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().slice(0, 10);
+    return { start, end };
+  }, [period, date]);
 
   useEffect(() => {
     setLoading(true);
     api
-      .get<DashboardSummary>(`/dashboard/summary?period=${period}`)
+      .get<DashboardSummary>(`/dashboard/summary?period=${period}&date=${date}`)
       .then((r: import('axios').AxiosResponse<DashboardSummary>) => setSummary(r.data))
       .finally(() => setLoading(false));
-  }, [period]);
+  }, [period, date]);
 
   const exportExcel = () => {
-    window.open(`${process.env.NEXT_PUBLIC_API_URL}/dashboard/export`, '_blank');
+    const { start, end } = range();
+    window.open(`${process.env.NEXT_PUBLIC_API_URL}/dashboard/export?start=${start}&end=${end}`, '_blank');
   };
 
   return (
@@ -43,7 +56,7 @@ export default function DashboardPanel() {
           </button>
         </div>
 
-        <div className="flex gap-2 mb-5">
+        <div className="flex gap-2 items-center mb-5">
           {(['day', 'month'] as const).map((p) => (
             <button
               key={p}
@@ -52,9 +65,15 @@ export default function DashboardPanel() {
                 period === p ? 'bg-orange-500 text-white' : 'bg-white border text-gray-600'
               }`}
             >
-              {p === 'day' ? 'วันนี้' : 'เดือนนี้'}
+              {p === 'day' ? 'รายวัน' : 'รายเดือน'}
             </button>
           ))}
+          <input
+            type={period === 'day' ? 'date' : 'month'}
+            value={period === 'day' ? date : date.slice(0, 7)}
+            onChange={(e) => setDate(period === 'day' ? e.target.value : `${e.target.value}-01`)}
+            className="ml-auto border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800"
+          />
         </div>
 
         {loading ? (

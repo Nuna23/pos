@@ -11,6 +11,10 @@ function route_branches($pdo, $rest, $method)
         return branches_list($pdo);
     }
 
+    if (count($rest) === 1 && $method === 'GET') {
+        return branch_one($pdo, (int) $rest[0]);
+    }
+
     if (count($rest) === 2 && $rest[1] === 'stock' && $method === 'GET') {
         return branch_stock_list($pdo, (int) $rest[0]);
     }
@@ -18,14 +22,34 @@ function route_branches($pdo, $rest, $method)
     json_out(array('error' => 'not found'), 404);
 }
 
+function branch_json($r)
+{
+    return array(
+        'id'      => (int) $r['id'],
+        'name'    => $r['name'],
+        'qrImage' => isset($r['qr_image']) && $r['qr_image'] !== '' ? $r['qr_image'] : null,
+    );
+}
+
 function branches_list($pdo)
 {
-    $rows = $pdo->query('SELECT id, name FROM branches ORDER BY id ASC')->fetchAll();
+    $rows = $pdo->query('SELECT id, name, qr_image FROM branches ORDER BY id ASC')->fetchAll();
     $out = array();
     foreach ($rows as $r) {
-        $out[] = array('id' => (int) $r['id'], 'name' => $r['name']);
+        $out[] = branch_json($r);
     }
     json_out($out);
+}
+
+function branch_one($pdo, $id)
+{
+    $stmt = $pdo->prepare('SELECT id, name, qr_image FROM branches WHERE id = ?');
+    $stmt->execute(array($id));
+    $row = $stmt->fetch();
+    if (!$row) {
+        json_out(array('error' => 'branch not found'), 404);
+    }
+    json_out(branch_json($row));
 }
 
 function branch_stock_list($pdo, $branchId)

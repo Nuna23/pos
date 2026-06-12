@@ -23,6 +23,9 @@ export default function CostPanel() {
   const [nStock, setNStock] = useState('');
   const [adding, setAdding] = useState(false);
 
+  // Read-only unallocated (central, not yet given to any branch) per product.
+  const [unalloc, setUnalloc] = useState<Record<number, number>>({});
+
   // Import
   const fileRef = useRef<HTMLInputElement>(null);
   const [importMsg, setImportMsg] = useState<string | null>(null);
@@ -35,6 +38,10 @@ export default function CostPanel() {
       setUnitCost(Object.fromEntries(r.data.map((p) => [p.id, String(p.unitCost)])));
       setCrepes(Object.fromEntries(r.data.map((p) => [p.id, String(p.crepesPerUnit)])));
     });
+    api
+      .get<{ id: number; unallocated: number }[]>('/admin/stock')
+      .then((r) => setUnalloc(Object.fromEntries(r.data.map((p) => [p.id, p.unallocated]))))
+      .catch(() => {});
   };
   useEffect(load, []);
 
@@ -215,6 +222,12 @@ export default function CostPanel() {
                 </span>
               </p>
             </div>
+            <p className="text-xs text-gray-500">
+              สต็อกที่ยังไม่ได้แบ่ง (เหลือแบ่ง):{' '}
+              <span className="font-semibold text-green-600">
+                {(unalloc[p.id] ?? 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+              </span>
+            </p>
             <div className="flex items-end gap-2 flex-wrap">
               <Labeled label="ขาย ฿">
                 <input type="number" min="0" value={price[p.id] ?? ''} onChange={(e) => setPrice((s) => ({ ...s, [p.id]: e.target.value }))} className={`${input} w-20`} />

@@ -21,12 +21,22 @@ function dashboard_summary($pdo)
     if ($period !== 'month') {
         $period = 'day';
     }
-    $start = $period === 'day' ? date('Y-m-d 00:00:00') : date('Y-m-01 00:00:00');
+    // Optional ?date=YYYY-MM-DD picks which day/month to view (default: now).
+    $base = v($_GET, 'date');
+    $ts   = $base ? strtotime($base) : time();
+
+    if ($period === 'day') {
+        $start = date('Y-m-d 00:00:00', $ts);
+        $end   = date('Y-m-d 00:00:00', strtotime('+1 day', $ts));
+    } else {
+        $start = date('Y-m-01 00:00:00', $ts);
+        $end   = date('Y-m-01 00:00:00', strtotime('+1 month', strtotime(date('Y-m-01', $ts))));
+    }
 
     $stmt = $pdo->prepare(
-        "SELECT * FROM orders WHERE created_at >= ? AND status <> 'CANCELLED'"
+        "SELECT * FROM orders WHERE created_at >= ? AND created_at < ? AND status <> 'CANCELLED'"
     );
-    $stmt->execute(array($start));
+    $stmt->execute(array($start, $end));
     $orders = $stmt->fetchAll();
 
     $totalRevenue = 0;
@@ -68,6 +78,7 @@ function dashboard_summary($pdo)
 
     json_out(array(
         'period'       => $period,
+        'date'         => date('Y-m-d', $ts),
         'totalRevenue' => $totalRevenue,
         'orderCount'   => $orderCount,
         'peakHours'    => $peakHours,

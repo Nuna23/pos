@@ -1,5 +1,6 @@
 'use client';
 
+import BranchQrModal from '@/components/admin/BranchQrModal';
 import { api } from '@/lib/api';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -51,6 +52,7 @@ export default function FinancePanel() {
   const [label, setLabel] = useState('');
   const [amount, setAmount] = useState('');
   const [freq, setFreq] = useState<Frequency>('ONCE');
+  const [showQr, setShowQr] = useState(false);
 
   // Window for the expenses list, matching the selected period.
   const range = useCallback(() => {
@@ -104,6 +106,15 @@ export default function FinancePanel() {
 
   return (
     <div className="p-4 max-w-2xl mx-auto space-y-4">
+      {showQr && <BranchQrModal onClose={() => setShowQr(false)} />}
+
+      <button
+        onClick={() => setShowQr(true)}
+        className="w-full bg-white border border-gray-200 rounded-xl py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+      >
+        🏷️ ตั้งค่า QR ชำระเงินรายสาขา
+      </button>
+
       {/* Period controls */}
       <div className="flex gap-2 items-center">
         {(['day', 'month'] as const).map((p) => (

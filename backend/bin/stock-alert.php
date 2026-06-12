@@ -1,6 +1,7 @@
 <?php
-// CLI entry point for the low-stock LINE alert. Run from cron, e.g.:
-//   */5 * * * * php /var/www/html/bin/stock-alert.php >/dev/null 2>&1
+// CLI entry point for the low-stock LINE alert. Run from cron — twice a day is
+// plenty (each low item is reported once until restocked), e.g.:
+//   0 15,19 * * * php /var/www/html/bin/stock-alert.php >/dev/null 2>&1
 // (Or hit GET /api/internal/stock-alert?secret=... over HTTP instead.)
 // PHP 5.6 compatible.
 

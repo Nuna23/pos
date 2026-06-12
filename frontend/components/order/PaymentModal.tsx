@@ -8,11 +8,14 @@ import QRCode from 'react-qr-code';
 interface Props {
   amount: number;
   loading: boolean;
+  // The branch's uploaded payment QR image (data URI); falls back to a
+  // generated PromptPay QR when not set.
+  qrImage?: string | null;
   onClose: () => void;
   onConfirm: (method: PaymentMethod) => void;
 }
 
-export default function PaymentModal({ amount, loading, onClose, onConfirm }: Props) {
+export default function PaymentModal({ amount, loading, qrImage, onClose, onConfirm }: Props) {
   const [method, setMethod] = useState<PaymentMethod>('QR');
 
   return (
@@ -51,9 +54,16 @@ export default function PaymentModal({ amount, loading, onClose, onConfirm }: Pr
         {method === 'QR' ? (
           <div className="flex flex-col items-center gap-2 py-2">
             <div className="bg-white p-3 rounded-xl border">
-              <QRCode value={promptPayPayload(PROMPTPAY_ID, amount)} size={180} />
+              {qrImage ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={qrImage} alt="QR ชำระเงิน" className="w-[180px] h-[180px] object-contain" />
+              ) : (
+                <QRCode value={promptPayPayload(PROMPTPAY_ID, amount)} size={180} />
+              )}
             </div>
-            <p className="text-xs text-gray-400">สแกนเพื่อชำระผ่าน PromptPay</p>
+            <p className="text-xs text-gray-400">
+              {qrImage ? 'สแกนเพื่อชำระเงิน' : 'สแกนเพื่อชำระผ่าน PromptPay'}
+            </p>
           </div>
         ) : (
           <div className="py-6 text-center text-gray-500 text-sm">

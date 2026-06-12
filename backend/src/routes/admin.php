@@ -42,7 +42,52 @@ function route_admin($pdo, $rest, $method)
         }
     }
 
+    // Per-branch payment QR image: POST /admin/branches/{id}/qr (upload),
+    // DELETE /admin/branches/{id}/qr (clear).
+    if (count($rest) === 3 && $rest[0] === 'branches' && $rest[2] === 'qr') {
+        $bid = (int) $rest[1];
+        if ($method === 'POST') {
+            return admin_branch_qr_set($pdo, $bid);
+        }
+        if ($method === 'DELETE') {
+            return admin_branch_qr_clear($pdo, $bid);
+        }
+    }
+
     json_out(array('error' => 'not found'), 404);
+}
+
+// Store an uploaded image as the branch's payment QR (base64 data URI in the DB
+// — avoids filesystem write-permission issues on shared hosting).
+function admin_branch_qr_set($pdo, $branchId)
+{
+    if (!in_array($branchId, array(1, 2, 3), true)) {
+        json_out(array('error' => 'invalid branch'), 400);
+    }
+    if (!isset($_FILES['file']) || $_FILES['file']['error'] !== UPLOAD_ERR_OK) {
+        json_out(array('error' => 'no image uploaded'), 400);
+    }
+    if ($_FILES['file']['size'] > 2 * 1024 * 1024) {
+        json_out(array('error' => 'รูปใหญ่เกินไป (สูงสุด 2MB)'), 400);
+    }
+
+    $tmp  = $_FILES['file']['tmp_name'];
+    $info = @getimagesize($tmp); // false if not a real image
+    $allowed = array('image/png' => 1, 'image/jpeg' => 1, 'image/webp' => 1, 'image/gif' => 1);
+    if ($info === false || !isset($allowed[$info['mime']])) {
+        json_out(array('error' => 'ไฟล์ต้องเป็นรูปภาพ (png/jpg/webp/gif)'), 400);
+    }
+
+    $dataUri = 'data:' . $info['mime'] . ';base64,' . base64_encode(file_get_contents($tmp));
+    $pdo->prepare('UPDATE branches SET qr_image = ? WHERE id = ?')->execute(array($dataUri, $branchId));
+
+    branch_one($pdo, $branchId); // returns the updated branch JSON
+}
+
+function admin_branch_qr_clear($pdo, $branchId)
+{
+    $pdo->prepare('UPDATE branches SET qr_image = NULL WHERE id = ?')->execute(array($branchId));
+    json_out(array('ok' => true, 'id' => $branchId));
 }
 
 // --- other costs (expenses) ---------------------------------------------

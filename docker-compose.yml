@@ -68,6 +68,23 @@ services:
     depends_on:
       - backend
 
+  # Runs the low-stock LINE check on a schedule (what a cPanel cron job would
+  # do in production). Times are Bangkok local via TZ. The alert_sent flag means
+  # each low item is reported once until restocked, so twice a day is plenty.
+  cron:
+    image: alpine:3.20
+    restart: unless-stopped
+    environment:
+      TZ: ICT-7 # POSIX form busybox understands = UTC+7 (Asia/Bangkok)
+    command:
+      - sh
+      - -c
+      - |
+        echo '0 15,19 * * * wget -q -O - "http://backend/api/internal/stock-alert?secret=changeme" >/dev/null 2>&1' > /etc/crontabs/root
+        crond -f -l 8
+    depends_on:
+      - backend
+
   phpmyadmin:
     image: phpmyadmin:5
     restart: unless-stopped

@@ -75,7 +75,8 @@ function ensure_schema($pdo)
         column_exists($pdo, 'products', 'unit_cost') &&
         column_exists($pdo, 'products', 'is_active') &&
         column_exists($pdo, 'orders', 'branch_id') &&
-        column_exists($pdo, 'expenses', 'frequency')
+        column_exists($pdo, 'expenses', 'frequency') &&
+        column_exists($pdo, 'branches', 'qr_image')
     ) {
         return; // already fully set up
     }
@@ -86,6 +87,10 @@ function ensure_schema($pdo)
     }
     if (!table_exists($pdo, 'branch_stock')) {
         create_branch_schema($pdo);
+    }
+    // Per-branch payment QR image (data URI), added later.
+    if (!column_exists($pdo, 'branches', 'qr_image')) {
+        safe_exec($pdo, 'ALTER TABLE branches ADD COLUMN qr_image MEDIUMTEXT NULL');
     }
     if (!column_exists($pdo, 'orders', 'branch_id')) {
         safe_exec($pdo, 'ALTER TABLE orders ADD COLUMN branch_id INT NULL');
@@ -122,8 +127,9 @@ function create_branch_schema($pdo)
 {
     $pdo->exec(
         "CREATE TABLE IF NOT EXISTS branches (
-            id   INT PRIMARY KEY,
-            name VARCHAR(100) NOT NULL
+            id       INT PRIMARY KEY,
+            name     VARCHAR(100) NOT NULL,
+            qr_image MEDIUMTEXT NULL
         ) CHARACTER SET utf8mb4"
     );
     $pdo->exec(

@@ -55,12 +55,17 @@ since plain PHP/Apache can't host a persistent socket server.
 
 ## Notifications
 
-- **LINE low-stock alert** — works on PHP 5.6. Trigger it from cron:
+- **LINE low-stock alert** — works on PHP 5.6. Nothing runs it automatically;
+  add a cron job on the server. The `alert_sent` flag means each low item is
+  reported once (until restocked), so a twice-a-day check is plenty — best
+  timed before opening and mid-afternoon:
   ```
-  */5 * * * * php /var/www/html/bin/stock-alert.php >/dev/null 2>&1
+  # 15:00 and 19:00 daily
+  0 15,19 * * * php /var/www/html/bin/stock-alert.php >/dev/null 2>&1
   # or over HTTP:
-  */5 * * * * curl -s "https://your-host/api/internal/stock-alert?secret=CHANGE_ME"
+  0 15,19 * * * curl -s "https://your-host/api/internal/stock-alert?secret=CHANGE_ME"
   ```
+  In the local Docker stack a `cron` service already runs this on schedule.
 - **Web push** ("your crepe is ready") — implemented in `src/lib/webpush.php`
   but requires **PHP 7.3+** (ECDH/HKDF/AES-GCM). On the PHP 5.6 Docker image it
   is a logged no-op; deploy on `ea-php82` (or set the Docker image to

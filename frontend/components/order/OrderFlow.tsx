@@ -44,6 +44,7 @@ export default function OrderFlow({ mode, branchId, onPlaced }: Props) {
   const [showPayment, setShowPayment] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [branchQr, setBranchQr] = useState<string | null>(null);
 
   const loadAvailability = useCallback(() => {
     api
@@ -67,6 +68,14 @@ export default function OrderFlow({ mode, branchId, onPlaced }: Props) {
   }, []);
 
   useEffect(loadAvailability, [loadAvailability]);
+
+  // The branch's payment QR image to show at checkout.
+  useEffect(() => {
+    api
+      .get<{ qrImage: string | null }>(`/branches/${branchId}`)
+      .then((r) => setBranchQr(r.data.qrImage))
+      .catch(() => {});
+  }, [branchId]);
 
   const inStock = (p: Product) => (available[p.id] ?? 0) >= p.deductionAmount;
 
@@ -278,6 +287,7 @@ export default function OrderFlow({ mode, branchId, onPlaced }: Props) {
         <PaymentModal
           amount={totalPrice}
           loading={loading}
+          qrImage={branchQr}
           onClose={() => setShowPayment(false)}
           onConfirm={placeOrder}
         />
