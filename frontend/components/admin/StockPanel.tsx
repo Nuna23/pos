@@ -1,5 +1,6 @@
 'use client';
 
+import { useToast } from '@/components/ui/useToast';
 import { api } from '@/lib/api';
 import { useEffect, useState } from 'react';
 
@@ -19,11 +20,13 @@ interface AdminStock {
 }
 
 export default function StockPanel() {
+  const { show, view: toast } = useToast();
   const [branches, setBranches] = useState<Branch[]>([]);
   const [products, setProducts] = useState<AdminStock[]>([]);
   const [amounts, setAmounts] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
 
   useEffect(() => {
     Promise.all([
@@ -49,27 +52,49 @@ export default function StockPanel() {
       });
       setProducts((prev) => prev.map((p) => (p.id === productId ? res.data : p)));
       setAmounts((prev) => ({ ...prev, [key]: '' }));
+      const bName = branches.find((b) => b.id === branchId)?.name ?? `สาขา ${branchId}`;
+      show(sign > 0 ? `แบ่ง ${amt} ให้ ${bName} แล้ว` : `คืน ${amt} จาก ${bName} แล้ว`);
     } catch {
-      setError(
+      const msg =
         sign > 0
           ? 'แบ่งไม่สำเร็จ — สต็อกคงเหลือไม่พอ'
-          : 'คืนไม่สำเร็จ — จำนวนเกินที่สาขามีอยู่',
-      );
+          : 'คืนไม่สำเร็จ — จำนวนเกินที่สาขามีอยู่';
+      setError(msg);
+      show(msg, 'error');
     } finally {
       setBusy(false);
     }
   };
 
+  const shown = query ? products.filter((p) => String(p.id) === query) : products;
+
   return (
     <div className="p-4 max-w-2xl mx-auto space-y-3">
+      {toast}
       <p className="text-xs text-gray-400">แบ่งสต็อกวัตถุดิบจากคลังกลางให้แต่ละสาขา</p>
+      <select
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-800 bg-white"
+      >
+        <option value="">ทั้งหมด ({products.length})</option>
+        {products.map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.name} ({p.category === 'DOUGH' ? 'แป้ง' : 'ไส้'})
+          </option>
+        ))}
+      </select>
       {error && (
           <div className="bg-red-50 border border-red-200 text-red-600 text-sm rounded-xl px-3 py-2">
             {error}
           </div>
         )}
 
-        {products.map((p) => (
+        {shown.length === 0 && (
+          <p className="text-sm text-gray-400 py-6 text-center">ไม่พบวัตถุดิบ</p>
+        )}
+
+        {shown.map((p) => (
           <div key={p.id} className="bg-white rounded-2xl p-4 shadow-sm">
             <div className="flex items-start justify-between">
               <div>
