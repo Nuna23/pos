@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls \"C:\\\\Users\\\\palmo\\\\OneDrive\\\\Desktop\\\\\" 2>/dev/null || dir \"C:\\\\Users\\\\palmo\\\\OneDrive\\\\Desktop\\\\\")",
+      "Read(//c/Users/palmo/OneDrive/Desktop\" 2>/dev/**)",
+      "Read(//c/Users/palmo/OneDrive/Desktop/**)"
+    ]
+  }
+}

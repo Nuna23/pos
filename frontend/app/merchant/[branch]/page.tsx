@@ -1,13 +1,14 @@
-'use client';
-
 import POSPanel from '@/components/merchant/POSPanel';
-import { useParams } from 'next/navigation';
+
+export function generateStaticParams() {
+  return [{ branch: '1' }, { branch: '2' }, { branch: '3' }];
+}
 
 const VALID_BRANCHES = [1, 2, 3];
 
-export default function MerchantBranchPage() {
-  const params = useParams();
-  const branchId = Number(params.branch);
+export default async function MerchantBranchPage({ params }: { params: Promise<{ branch: string }> }) {
+  const { branch } = await params;
+  const branchId = Number(branch);
 
   if (!VALID_BRANCHES.includes(branchId)) {
     return (

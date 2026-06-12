@@ -21,7 +21,7 @@ export default function MenuSelector({ branchId }: Props) {
       <OrderFlow
         mode="customer"
         branchId={branchId}
-        onPlaced={(order) => router.push(`/queue/${order.id}`)}
+        onPlaced={(order) => router.push(`/queue?id=${order.id}`)}
       />
     </div>
   );
