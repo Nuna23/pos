@@ -21,8 +21,8 @@ return array(
     'frontend_url' => getenv('FRONTEND_URL') ?: 'http://localhost:3000',
 
     // --- LINE Messaging API (low-stock alert pushed to the owner) ---
-    'line_token'   => getenv('LINE_CHANNEL_ACCESS_TOKEN') ?: '',
-    'line_user_id' => getenv('LINE_NOTIFY_USER_ID') ?: '',
+    'line_token'   => getenv('LINE_CHANNEL_ACCESS_TOKEN') ?: 'JAl69IIqE0bSyBxqYeSMMAK4FqaQb0k2NutAyYzskq9WZBc4DSyIlP2xoBH+XNTnl53tUbM9mZoGh5usPfT5TFoWFGVz25qbSz8syp3ZM8jxFt7aVyaGilQlnILigSt9u3CM3PXAF18iyPnCCM3RZQdB04t89/1O/w1cDnyilFU=',
+    'line_user_id' => getenv('LINE_NOTIFY_USER_ID') ?: 'Ud04904aa1580d7e4597c2c83d7c0e103',
 
     // --- Web Push (VAPID) — "your crepe is ready" to the customer ---
     'vapid_public'  => getenv('VAPID_PUBLIC_KEY') ?: 'BApbdQIY77kyE2g05LVZiABYVcY7T7xAlJAAvXzp3mqWT6cNmsx5b85VqnAAh_H9-FmtzppDRRQW-L9-m6aoyb0',
