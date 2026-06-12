@@ -100,6 +100,27 @@ function products_create($pdo)
         json_out(array('error' => 'crepesPerUnit must be a positive number'), 400);
     }
 
+    // Names are unique. If one already exists, either it's a live ingredient
+    // (reject with a clear message) or a soft-deleted one (reactivate it with
+    // the new values) — avoids a raw duplicate-key 500.
+    $stmt = $pdo->prepare('SELECT id, is_active FROM products WHERE name = ?');
+    $stmt->execute(array($name));
+    $existing = $stmt->fetch();
+    if ($existing) {
+        if ((int) $existing['is_active'] === 1) {
+            json_out(array('error' => 'มีวัตถุดิบชื่อนี้อยู่แล้ว'), 409);
+        }
+        $id = (int) $existing['id'];
+        $stmt = $pdo->prepare(
+            'UPDATE products
+                SET is_active = 1, category = ?, price = ?, unit_cost = ?, crepes_per_unit = ?,
+                    stock_quantity = ?, alert_threshold = ?, deduction_amount = ?, alert_sent = 0
+              WHERE id = ?'
+        );
+        $stmt->execute(array($category, $price, $unitCost, $crepesPer, $stock, $thresh, $deduct, $id));
+        json_out(product_json(product_row($pdo, $id)), 201);
+    }
+
     $stmt = $pdo->prepare(
         'INSERT INTO products (name, category, price, unit_cost, crepes_per_unit, stock_quantity, alert_threshold, deduction_amount)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
@@ -117,6 +138,21 @@ function products_update($pdo, $id)
     }
     $b = json_body();
 
+    // Renaming to a name another row already uses would hit UNIQUE(name) with a
+    // raw 500 — reject cleanly instead.
+    if (array_key_exists('name', $b)) {
+        $newName = trim((string) $b['name']);
+        if ($newName === '') {
+            json_out(array('error' => 'name is required'), 400);
+        }
+        $stmt = $pdo->prepare('SELECT id FROM products WHERE name = ? AND id <> ?');
+        $stmt->execute(array($newName, $id));
+        if ($stmt->fetch()) {
+            json_out(array('error' => 'มีวัตถุดิบชื่อนี้อยู่แล้ว'), 409);
+        }
+        $b['name'] = $newName;
+    }
+
     // Only update fields that were actually provided (partial update).
     $map = array(
         'name'            => 'name',
@@ -128,6 +164,20 @@ function products_update($pdo, $id)
         'alertThreshold'  => 'alert_threshold',
         'deductionAmount' => 'deduction_amount',
     );
+    // Central stock can't be set below what branches already hold, or the
+    // unallocated remainder would go negative.
+    if (array_key_exists('stockQuantity', $b)) {
+        if (!is_numeric($b['stockQuantity']) || $b['stockQuantity'] < 0) {
+            json_out(array('error' => 'stockQuantity must be a number >= 0'), 400);
+        }
+        $stmt = $pdo->prepare('SELECT COALESCE(SUM(quantity),0) FROM branch_stock WHERE product_id = ?');
+        $stmt->execute(array($id));
+        $allocated = (float) $stmt->fetchColumn();
+        if ((float) $b['stockQuantity'] < $allocated) {
+            json_out(array('error' => "สต็อกรวมต้องไม่น้อยกว่าที่แบ่งให้สาขาแล้ว ($allocated)"), 400);
+        }
+    }
+
     $sets   = array();
     $params = array();
     foreach ($map as $jsonKey => $col) {
@@ -163,6 +213,15 @@ function products_replenish($pdo, $id)
     $amount = v(json_body(), 'amount');
     if (!is_numeric($amount)) {
         json_out(array('error' => 'amount must be a number'), 400);
+    }
+    // Reducing stock can't drop the total below what branches already hold.
+    if ($amount < 0) {
+        $stmt = $pdo->prepare('SELECT COALESCE(SUM(quantity),0) FROM branch_stock WHERE product_id = ?');
+        $stmt->execute(array($id));
+        $allocated = (float) $stmt->fetchColumn();
+        if ((float) $row['stock_quantity'] + (float) $amount < $allocated) {
+            json_out(array('error' => "สต็อกรวมต้องไม่น้อยกว่าที่แบ่งให้สาขาแล้ว ($allocated)"), 400);
+        }
     }
     $stmt = $pdo->prepare(
         'UPDATE products SET stock_quantity = stock_quantity + ?, alert_sent = 0 WHERE id = ?'

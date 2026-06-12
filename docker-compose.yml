@@ -61,7 +61,10 @@ services:
       args:
         # Browser-facing URLs (the browser, not the container, calls these).
         NEXT_PUBLIC_API_URL: http://localhost:3001/api
-        NEXT_PUBLIC_VAPID_PUBLIC_KEY: ""
+        # Must match the backend's VAPID_PUBLIC_KEY (config.php). Lets the
+        # customer's browser subscribe to web push. Delivery still needs the
+        # backend on PHP >= 7.3 to encrypt the payload.
+        NEXT_PUBLIC_VAPID_PUBLIC_KEY: "BApbdQIY77kyE2g05LVZiABYVcY7T7xAlJAAvXzp3mqWT6cNmsx5b85VqnAAh_H9-FmtzppDRRQW-L9-m6aoyb0"
     restart: unless-stopped
     ports:
       - "3000:3000"

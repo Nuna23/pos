@@ -3,6 +3,7 @@
 import ToppingPicker from '@/components/customer/ToppingPicker';
 import PaymentModal from '@/components/order/PaymentModal';
 import { api } from '@/lib/api';
+import { getPushSubscription } from '@/lib/push';
 import { Order, PaymentMethod, Product } from '@/types';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -118,21 +119,13 @@ export default function OrderFlow({ mode, branchId, onPlaced }: Props) {
     setLoading(true);
     setError(null);
     try {
-      // The customer waits on the queue page, which fires a local notification
-      // when the order turns DONE (works on any backend — no web push). Ask for
-      // permission now, while we have the user's tap, and register the SW that
-      // shows the notification.
-      if (mode === 'customer' && typeof window !== 'undefined' && 'Notification' in window) {
-        try {
-          if ('serviceWorker' in navigator) {
-            await navigator.serviceWorker.register('/sw.js');
-          }
-          if (Notification.permission === 'default') {
-            await Notification.requestPermission();
-          }
-        } catch {
-          // Notifications unavailable/denied — order proceeds without them.
-        }
+      // A customer ordering on their own phone subscribes to web push (while we
+      // have their tap, for the permission prompt) so the backend can notify
+      // them when the crepe is ready — even with the page closed/phone locked.
+      // The queue page also fires a local notification as a foreground fallback.
+      let pushSubscription = null;
+      if (mode === 'customer') {
+        pushSubscription = await getPushSubscription();
       }
 
       // Each cart line expands to `quantity` identical items; the whole cart is
@@ -148,6 +141,7 @@ export default function OrderFlow({ mode, branchId, onPlaced }: Props) {
         branchId,
         items,
         paymentMethod,
+        ...(pushSubscription ? { pushSubscription } : {}),
       });
       setCart([]);
       setShowPayment(false);
